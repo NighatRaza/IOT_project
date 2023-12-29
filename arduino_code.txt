@@ -1,0 +1,88 @@
+#include <WiFi.h>
+#include "DHT.h"
+
+#define DHTPIN 27
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+const char* ssid = "Enayat"; // network
+const char* password = "enayat123";
+const char* host = "192.168.0.105"; // local_IP
+const int httpPort = 80; // default HTTP Port
+
+void setup() {
+    Serial.begin(9600);
+    Serial.println("DHT11 Output!");
+    dht.begin();
+
+    // We start by connecting to a WiFi network
+    Serial.println();
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
+
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+}
+
+void loop() {
+    float temperature = dht.readTemperature();
+    float humidity = dht.readHumidity();
+  
+    if (!isnan(temperature) && !isnan(humidity)) {
+        Serial.print("Humidity: ");
+        Serial.print(humidity);
+        Serial.print(" %\t");
+        Serial.print("Temperature: ");
+        Serial.print(temperature);
+        Serial.println(" *C");
+
+        Serial.print("Connecting to ");
+        Serial.println(host);
+
+        // Use WiFiClient class to create TCP connections
+        WiFiClient client;
+
+        if (client.connect(host, httpPort)) {
+            Serial.println("Connected to server");
+
+            // Construct the request URL with temperature and humidity as parameters
+            String requestURL = "/IOT_project/connect.php?temperature=" + String(temperature) + "&humidity=" + String(humidity);
+
+            Serial.print("Request URL: ");
+            Serial.println(requestURL);
+
+            // Send the request to the server
+            client.print(String("GET ") + requestURL + " HTTP/1.1\r\n" +
+                         "Host: " + host + "\r\n" +
+                         "Connection: close\r\n\r\n");
+
+            delay(5000); // Allow time for server to process the request
+
+            // Read and print the response from the server
+            while (client.available()) {
+                String line = client.readStringUntil('\r');
+                Serial.print(line);
+            }
+
+            Serial.println();
+            Serial.println("Closing connection");
+            client.stop();
+        } else {
+            Serial.println("Connection to server failed");
+        }
+    } else {
+        Serial.println("Failed to read valid DHT11 data");
+    }
+
+    delay(10000); //  delay of 10s data sending frequency
+}
